@@ -1,0 +1,2 @@
+.devcontainer/zot/data/*
+!.devcontainer/zot/data/.placeholder
