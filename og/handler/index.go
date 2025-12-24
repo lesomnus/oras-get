@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 
 	oci "github.com/opencontainers/image-spec/specs-go/v1"
+	"oras.land/oras-go/v2/errdef"
 )
 
 type indexHandler struct {
@@ -14,15 +17,22 @@ type indexHandler struct {
 }
 
 func (h *indexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	i := slices.IndexFunc(h.manifest.Manifests, func(v oci.Descriptor) bool {
-		p := v.Platform
-		if p == nil {
+	p := h.platform.Normalized()
+	f := func(v oci.Descriptor) bool {
+		vp := v.Platform
+		if vp == nil {
 			return false
 		}
 
-		os, arch, variant := h.platform.Split()
-		return p.OS == os && p.Architecture == arch && p.Variant == variant
-	})
+		os, arch, variant := p.Split()
+		return vp.OS == os && vp.Architecture == arch && vp.Variant == variant
+	}
+
+	i := slices.IndexFunc(h.manifest.Manifests, f)
+	if i < 0 {
+		p = h.platform
+		i = slices.IndexFunc(h.manifest.Manifests, f)
+	}
 	if i < 0 {
 		http.Error(w, "no manifest for the specified platform", http.StatusNotFound)
 		return
@@ -31,7 +41,11 @@ func (h *indexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	desc := h.manifest.Manifests[i]
 	rc, err := h.repo.Manifests().Fetch(r.Context(), desc)
 	if err != nil {
-		http.Error(w, "fetch manifest: "+err.Error(), http.StatusInternalServerError)
+		if errors.Is(err, errdef.ErrNotFound) {
+			http.Error(w, err.Error(), http.StatusPreconditionFailed)
+		} else {
+			http.Error(w, fmt.Sprintf("fetch manifest: %s", err), http.StatusInternalServerError)
+		}
 		return
 	}
 	defer rc.Close()

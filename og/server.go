@@ -26,7 +26,13 @@ func NewServer(domain string) *Server {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	switch r.Method {
+	case http.MethodGet, http.MethodHead:
+		break
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
 	// r.URL.Path is like /<path>:<tag>[/<platform>]
 	path, platform, err := parsePath(r.URL.Path)
@@ -53,6 +59,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		tag = tagged.Tag()
 	}
 
+	ctx := r.Context()
 	repo, err := remote.NewRepository(ref.Name())
 	if err != nil {
 		s.fail(ctx, w, err)

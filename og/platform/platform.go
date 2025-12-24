@@ -19,10 +19,13 @@ const (
 	ArchArm64 Arch = "arm64"
 	ArchAmd64 Arch = "amd64"
 
-	VariantArmV6   Variant = "v6"
-	VariantArmV7   Variant = "v7"
-	VariantArmV8   Variant = "v8"
-	VariantArmV8_1 Variant = "v8.1"
+	ArchX86_64  Arch = "x86_64"
+	ArchAArch32 Arch = "aarch32"
+	ArchAArch64 Arch = "aarch64"
+
+	VariantArmV6 Variant = "v6"
+	VariantArmV7 Variant = "v7"
+	VariantArmV8 Variant = "v8"
 )
 
 type Platform string
@@ -56,4 +59,38 @@ func (p Platform) Arch() string {
 func (p Platform) Variant() string {
 	_, _, variant := p.Split()
 	return variant
+}
+
+func (p Platform) Normalized() Platform {
+	os, arch, variant := p.Split()
+	if os == "" {
+		return ""
+	}
+	if arch == "" {
+		return Platform(os)
+	}
+
+	arch_ := Arch(arch)
+	switch Arch(arch) {
+	case ArchX86_64:
+		arch_ = ArchAmd64
+	case ArchAArch32:
+		arch_ = ArchArm
+	case ArchAArch64:
+		arch_ = ArchArm64
+	}
+
+	p_ := string(p)
+	if arch_ != Arch(arch) {
+		p_ = strings.Join([]string{os, string(arch_), variant}, "/")
+	}
+
+	var ok bool
+	for {
+		if p_, ok = strings.CutSuffix(p_, "/"); !ok {
+			break
+		}
+	}
+
+	return Platform(p_)
 }
