@@ -5,10 +5,10 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/lesomnus/oras-get/og/platform"
+	"github.com/lesomnus/oras-get/refs"
 	"github.com/lesomnus/z"
 	oci "github.com/opencontainers/image-spec/specs-go/v1"
-	"oras.land/oras-go/v2/registry/remote"
+	"oras.land/oras-go/v2/registry"
 )
 
 type Handler interface {
@@ -17,7 +17,7 @@ type Handler interface {
 	Parse(r io.Reader) error
 }
 
-func Resolve(repo *remote.Repository, desc oci.Descriptor, platform platform.Platform) (Handler, bool) {
+func Resolve(repo registry.Repository, desc oci.Descriptor, platform refs.Platform) (Handler, bool) {
 	h_ := handler{repo, desc, platform}
 
 	var h Handler
@@ -34,9 +34,9 @@ func Resolve(repo *remote.Repository, desc oci.Descriptor, platform platform.Pla
 }
 
 type handler struct {
-	repo     *remote.Repository
+	repo     registry.Repository
 	desc     oci.Descriptor
-	platform platform.Platform
+	platform refs.Platform
 }
 
 type portable struct{}

@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/lesomnus/oras-get/og/handler"
-	"github.com/lesomnus/oras-get/og/platform"
+	"github.com/lesomnus/oras-get/refs"
 	"github.com/opencontainers/go-digest"
 	oci "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/require"
@@ -90,7 +90,7 @@ func TestIndex(t *testing.T) {
 		x.NoError(err)
 
 		for p, manifest := range manifests {
-			h, ok := handler.Resolve(repo, oci.Descriptor{MediaType: oci.MediaTypeImageIndex}, platform.Platform("linux/"+p))
+			h, ok := handler.Resolve(repo, oci.Descriptor{MediaType: oci.MediaTypeImageIndex}, refs.Platform("linux/"+p))
 			x.True(ok)
 
 			err = h.Parse(bytes.NewReader(m))

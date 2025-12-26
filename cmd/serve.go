@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
-	"github.com/lesomnus/oras-get/og"
+	"github.com/lesomnus/oras-get/config"
+	"github.com/lesomnus/otx/log"
 	"github.com/lesomnus/xli"
+	"github.com/lesomnus/z"
 )
 
 func NewCmdServe() *xli.Command {
@@ -13,13 +16,27 @@ func NewCmdServe() *xli.Command {
 		Name: "serve",
 
 		Handler: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
-			server := og.NewServer("registry:5000")
+			l := log.From(ctx)
+			c := config.From(ctx)
+
+			r, err := c.NewRouter()
+			if err != nil {
+				return z.Err(err, "build router")
+			}
 
 			s := http.Server{
-				Addr:    "localhost:5001",
-				Handler: server,
+				Addr:    c.Server.Addr.HostPort(),
+				Handler: r,
 			}
-			if err := s.ListenAndServe(); err != nil {
+
+			l.Info("listen", slog.String("addr", s.Addr))
+			lis, err := c.Server.Addr.Listen()
+			if err != nil {
+				return z.Err(err, "listen %s", s.Addr)
+			}
+
+			l.Info("serve")
+			if err := s.Serve(lis); err != nil {
 				return err
 			}
 			return next(ctx)

@@ -1,0 +1,35 @@
+server:
+  addr: 127.0.0.1:5001
+
+registries:
+  ghcr.io:
+    addr: https://ghcr.io
+  # The prefix `~` has no special meaning. However, since `~` is not allowed in the reference,
+  # it will not match any user request, making it suitable as a fallback registry name.
+  ~fallback:
+    addr: http://127.0.0.1:5000
+
+routes:
+  # Lookup a registry in the `registries` section using the domain from the request as the key.
+  # If no registry is found, continue to the next route.
+  - next: "{{ .Domain }}"
+  # If the request does not contain a domain, fallback to `registries.~fallback`.
+  - next: ~fallback
+    domain: ""
+
+otel:
+  enabled: true
+  processors:
+    batcher:
+    resource:
+      attributes:
+        - key: service.instance
+          value: dev
+
+  exporters:
+    pretty:
+
+  providers:
+    logger:
+      exporters:
+        - pretty
