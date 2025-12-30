@@ -16,6 +16,9 @@ services:
       - type: bind
         source: ../
         target: /workspace/
+      - type: bind
+        source: ${HOME}/workspaces
+        target: /workspaces
       - type: volume
         source: go.cache.mod
         target: /go/pkg/mod/

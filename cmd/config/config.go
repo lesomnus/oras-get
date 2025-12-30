@@ -66,6 +66,7 @@ func (c *Config) Evaluate() error {
 		z.CatErr(".server", c.Server.Evaluate()),
 		z.CatErr(".registries", errors.Join(err_registries...)),
 		z.CatErr(".routes", errors.Join(err_routes...)),
+		z.CatErr(".otel", c.Otel.Evaluate()),
 	)
 }
 

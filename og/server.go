@@ -2,12 +2,15 @@ package og
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/lesomnus/oras-get/og/handler"
 	"github.com/lesomnus/oras-get/refs"
+	"github.com/lesomnus/otx/log"
+	"oras.land/oras-go/v2/errdef"
 	"oras.land/oras-go/v2/registry/remote"
 )
 
@@ -42,7 +45,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	repo, err := s.registry.Repository(r.Context(), ref.Repo())
+	repo, err := s.registry.Repository(ctx, ref.Repo())
 	if err != nil {
 		s.fail(ctx, w, err)
 		return
@@ -50,6 +53,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	desc, rc, err := repo.Manifests().FetchReference(ctx, ref.Tag())
 	if err != nil {
+		if errors.Is(err, errdef.ErrNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 		s.fail(ctx, w, err)
 		return
 	}
@@ -76,6 +83,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) fail(ctx context.Context, w http.ResponseWriter, err error) {
-	fmt.Printf("err.Error(): %v\n", err.Error())
+	log.From(ctx).Warn("request failed", slog.String("err", err.Error()))
 	http.Error(w, "internal server error", http.StatusInternalServerError)
 }

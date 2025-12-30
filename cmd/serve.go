@@ -5,8 +5,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/lesomnus/oras-get/config"
+	"github.com/lesomnus/oras-get/cmd/config"
+	"github.com/lesomnus/otx"
 	"github.com/lesomnus/otx/log"
+	"github.com/lesomnus/otx/otxhttp"
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/z"
 )
@@ -24,15 +26,17 @@ func NewCmdServe() *xli.Command {
 				return z.Err(err, "build router")
 			}
 
-			s := http.Server{
-				Addr:    c.Server.Addr.HostPort(),
-				Handler: r,
-			}
+			h := http.Handler(r)
+			h = otxhttp.BoundaryLogger()(h)
+			h = otxhttp.NewMiddleware(otx.From(ctx), "serve")(h)
+			s := http.Server{Handler: h}
 
-			l.Info("listen", slog.String("addr", s.Addr))
+			addr := c.Server.Addr.HostPort()
+
+			l.Info("listen", slog.String("addr", addr))
 			lis, err := c.Server.Addr.Listen()
 			if err != nil {
-				return z.Err(err, "listen %s", s.Addr)
+				return z.Err(err, "listen %s", addr)
 			}
 
 			l.Info("serve")

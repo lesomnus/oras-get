@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/lesomnus/oras-get/config"
+	"github.com/lesomnus/oras-get/cmd/config"
 	"github.com/lesomnus/otx"
 	"github.com/lesomnus/otx/log"
 	"github.com/lesomnus/xli"
@@ -26,6 +26,7 @@ func NewCmdRoot() *xli.Command {
 
 		Commands: xli.Commands{
 			NewCmdVersion(),
+			NewCmdConfig(),
 			NewCmdServe(),
 		},
 

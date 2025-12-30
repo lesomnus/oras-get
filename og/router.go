@@ -1,11 +1,13 @@
 package og
 
 import (
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/lesomnus/oras-get/match"
 	"github.com/lesomnus/oras-get/refs"
+	"github.com/lesomnus/otx/log"
 )
 
 type Router struct {
@@ -23,7 +25,7 @@ func (s *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, m := range s.Matchers {
+	for i, m := range s.Matchers {
 		name, ok := m.Match(ref)
 		if !ok {
 			continue
@@ -39,6 +41,16 @@ func (s *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h = http.StripPrefix("/"+ref.Domain(), h)
 		}
 
+		ctx := r.Context()
+		l := log.From(ctx)
+		l = l.With(slog.String("upstream", name))
+		l.Info("route",
+			slog.Int("matcher", i),
+			slog.String("ref", s.registry.Reference.String()),
+		)
+
+		ctx = log.Into(ctx, l)
+		r = r.WithContext(ctx)
 		h.ServeHTTP(w, r)
 		return
 	}

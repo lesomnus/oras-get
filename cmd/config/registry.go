@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/lesomnus/oras-get/addr"
+	"github.com/lesomnus/otx/otxhttp"
 	"github.com/lesomnus/z"
 	"oras.land/oras-go/v2/registry/remote"
 )
@@ -33,7 +34,9 @@ func (u *RegistryConfig) Build(name string) (*remote.Registry, error) {
 	}
 
 	// TODO: from options
-	reg.Client = http.DefaultClient
+	reg.Client = &http.Client{
+		Transport: otxhttp.NewTransport(http.DefaultTransport),
+	}
 
 	return reg, nil
 }

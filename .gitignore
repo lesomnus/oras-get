@@ -1,3 +1,6 @@
+go.work
+go.work.sum
+
 .devcontainer/zot/data/*
 !.devcontainer/zot/data/.placeholder
-cmd/version.g.go
+cmd/version/version.g.go

@@ -9,8 +9,8 @@ import (
 )
 
 type RouteConfig struct {
-	Domain *string
-	Repo   *string
+	Domain *string `yaml:",omitempty"`
+	Repo   *string `yaml:",omitempty"`
 
 	Next string
 }

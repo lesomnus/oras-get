@@ -7,7 +7,7 @@ registries:
   # The prefix `~` has no special meaning. However, since `~` is not allowed in the reference,
   # it will not match any user request, making it suitable as a fallback registry name.
   ~fallback:
-    addr: http://127.0.0.1:5000
+    addr: http://registry:5000
 
 routes:
   # Lookup a registry in the `registries` section using the domain from the request as the key.
@@ -20,7 +20,6 @@ routes:
 otel:
   enabled: true
   processors:
-    batcher:
     resource:
       attributes:
         - key: service.instance
