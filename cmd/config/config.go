@@ -8,6 +8,7 @@ import (
 
 	"github.com/lesomnus/oras-get/match"
 	"github.com/lesomnus/oras-get/og"
+	"github.com/lesomnus/oras-get/og/upstream"
 	"github.com/lesomnus/z"
 	"gopkg.in/yaml.v3"
 )
@@ -72,15 +73,15 @@ func (c *Config) Evaluate() error {
 
 func (c *Config) NewRouter() (*og.Router, error) {
 	r := &og.Router{
-		Upstreams: map[string]og.Server{},
+		Upstreams: map[string]upstream.Upstream{},
 		Matchers:  []match.Matcher{},
 	}
 	for k, v := range c.Registries {
-		registry, err := v.Build(v.Addr.HostPort())
+		upstream, err := v.Build()
 		if err != nil {
 			return nil, z.Err(err, "build registry %q", k)
 		}
-		r.Upstreams[k] = og.NewServer(registry)
+		r.Upstreams[k] = upstream
 	}
 	for i, v := range c.Routes {
 		m, err := v.Build()

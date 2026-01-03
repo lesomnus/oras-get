@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/lesomnus/oras-get/og/handler"
+	"github.com/lesomnus/oras-get/og/upstream"
+	"github.com/lesomnus/oras-get/refs"
 	"github.com/opencontainers/go-digest"
 	oci "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/require"
@@ -27,12 +29,19 @@ func TestManifest(t *testing.T) {
 		}))
 		defer s.Close()
 
-		repo, err := remote.NewRepository(fmt.Sprintf("%s/foo", s.URL[len("http://"):]))
+		ref, err := refs.Parse(s.URL[len("http://"):] + "/foo:bar")
 		x.NoError(err)
 
-		repo.Client = s.Client()
-		repo.PlainHTTP = true
-		h, ok := handler.Resolve(repo, oci.Descriptor{MediaType: oci.MediaTypeImageManifest}, "")
+		reg, err := remote.NewRegistry(ref.Domain())
+		x.NoError(err)
+
+		reg.Client = s.Client()
+		reg.PlainHTTP = true
+
+		upstream := upstream.Upstream{Registry: reg}
+		repo, err := upstream.Repository(t.Context(), ref)
+
+		h, ok := handler.Resolve(repo, oci.Descriptor{MediaType: oci.MediaTypeImageManifest})
 		x.True(ok)
 
 		m, err := json.Marshal(oci.Manifest{
@@ -68,12 +77,19 @@ func TestManifest(t *testing.T) {
 		}))
 		defer s.Close()
 
-		repo, err := remote.NewRepository(fmt.Sprintf("%s/foo", s.URL[len("http://"):]))
+		ref, err := refs.Parse(s.URL[len("http://"):] + "/foo:bar")
 		x.NoError(err)
 
-		repo.Client = s.Client()
-		repo.PlainHTTP = true
-		h, ok := handler.Resolve(repo, oci.Descriptor{MediaType: oci.MediaTypeImageManifest}, "")
+		reg, err := remote.NewRegistry(ref.Domain())
+		x.NoError(err)
+
+		reg.Client = s.Client()
+		reg.PlainHTTP = true
+
+		upstream := upstream.Upstream{Registry: reg}
+		repo, err := upstream.Repository(t.Context(), ref)
+
+		h, ok := handler.Resolve(repo, oci.Descriptor{MediaType: oci.MediaTypeImageManifest})
 		x.True(ok)
 
 		m, err := json.Marshal(oci.Manifest{
@@ -96,7 +112,7 @@ func TestManifest(t *testing.T) {
 	t.Run("412 if there are multiple layers", func(t *testing.T) {
 		x := require.New(t)
 
-		h, ok := handler.Resolve(nil, oci.Descriptor{MediaType: oci.MediaTypeImageManifest}, "")
+		h, ok := handler.Resolve(upstream.Repository{}, oci.Descriptor{MediaType: oci.MediaTypeImageManifest})
 		x.True(ok)
 
 		m, err := json.Marshal(oci.Manifest{

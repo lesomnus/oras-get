@@ -8,6 +8,7 @@ registries:
   # it will not match any user request, making it suitable as a fallback registry name.
   ~fallback:
     addr: http://registry:5000
+    redirect: true
 
 routes:
   # Lookup a registry in the `registries` section using the domain from the request as the key.

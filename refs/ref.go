@@ -2,69 +2,18 @@ package refs
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/distribution/reference"
 	"github.com/lesomnus/z"
 )
 
-type Ref interface {
-	Domain() string
-	Repo() string
-	Tag() string
-	Platform() Platform
-}
-
-func Name(ref Ref) string {
-	domain := ref.Domain()
-	if domain == "" {
-		return ref.Repo()
-	}
-
-	return fmt.Sprintf("%s/%s", domain, ref.Repo())
-}
-
-type ref struct {
-	domain   string
-	repo     string
-	tag      string
-	platform Platform
-}
-
-func (r *ref) String() string {
-	s := ""
-	if r.domain != "" {
-		s += r.domain + "/"
-	}
-	s += r.repo + ":" + r.tag
-	if p := r.platform.String(); p != "" {
-		s += "/" + p
-	}
-
-	return s
-}
-
-func (r *ref) Domain() string {
-	return r.domain
-}
-
-func (r *ref) Repo() string {
-	return r.repo
-}
-
-func (r *ref) Tag() string {
-	return r.tag
-}
-
-func (r *ref) Platform() Platform {
-	return r.platform
-}
+type Ref string
 
 func Parse(s string) (Ref, error) {
 	i := strings.LastIndex(s, ":")
 	if i < 0 {
-		return nil, errors.New("tag not found")
+		return "", errors.New("tag not found")
 	}
 
 	p := ""
@@ -76,30 +25,90 @@ func Parse(s string) (Ref, error) {
 
 	v, err := reference.Parse(s)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	w, ok := v.(reference.NamedTagged)
 	if !ok {
-		return nil, z.Err(reference.ErrReferenceInvalidFormat, "reference must be tagged")
+		return "", z.Err(reference.ErrReferenceInvalidFormat, "reference must be tagged")
 	}
 
-	r := &ref{
-		domain:   reference.Domain(w),
-		repo:     reference.Path(w),
-		tag:      w.Tag(),
-		platform: Platform(p),
+	return buildRef(reference.Domain(w), reference.Path(w), w.Tag(), Platform(p)), nil
+}
+
+func buildRef(domain, repo, tag string, platform Platform) Ref {
+	r := ""
+	if domain != "" {
+		r += domain + "/"
+	}
+	r += repo + ":" + tag
+	if platform != "" {
+		r += "/" + string(platform)
+	}
+	return Ref(r)
+}
+
+func (r Ref) Split() (domain string, repo string, tag string, platform Platform) {
+	// [domain/]<repo>:<tag>[/<platform>]
+	if i := strings.LastIndex(string(r), ":"); i < 0 {
+		panic("invalid ref: no tag")
+	} else {
+		repo = string(r[:i])
+		tag = string(r[i+1:])
 	}
 
-	domain := reference.Domain(w)
-	if domain == "" {
-		return r, nil
-	}
-	if strings.ContainsAny(domain, ".:[]") {
-		return r, nil
+	// Find domain
+	if i := strings.Index(repo, "/"); i >= 0 {
+		d := repo[:i]
+		if strings.Contains(d, ".") || strings.Contains(d, ":") {
+			domain = d
+			repo = repo[i+1:]
+		}
 	}
 
-	r.domain = ""
-	r.repo = w.Name()
-	return r, nil
+	// Find platform
+	if i := strings.Index(tag, "/"); i >= 0 {
+		platform = Platform(tag[i+1:])
+		tag = tag[:i]
+	}
+
+	return
+}
+
+func (r Ref) Domain() string {
+	v, _, _, _ := r.Split()
+	return v
+}
+
+func (r Ref) Repo() string {
+	_, v, _, _ := r.Split()
+	return v
+}
+
+func (r Ref) Tag() string {
+	_, _, v, _ := r.Split()
+	return v
+}
+
+func (r Ref) Platform() Platform {
+	_, _, _, v := r.Split()
+	return v
+}
+
+func (r Ref) Name() string {
+	domain, repo, _, _ := r.Split()
+	if domain != "" {
+		return domain + "/" + repo
+	}
+	return repo
+}
+
+func WithDomain(r Ref, d string) Ref {
+	_, repo, tag, p := r.Split()
+	return buildRef(d, repo, tag, p)
+}
+
+func WithPlatform(r Ref, p Platform) Ref {
+	domain, repo, tag, _ := r.Split()
+	return buildRef(domain, repo, tag, p)
 }

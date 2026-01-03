@@ -5,10 +5,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/lesomnus/oras-get/refs"
+	"github.com/lesomnus/oras-get/og/upstream"
 	"github.com/lesomnus/z"
 	oci "github.com/opencontainers/image-spec/specs-go/v1"
-	"oras.land/oras-go/v2/registry"
 )
 
 type Handler interface {
@@ -17,8 +16,8 @@ type Handler interface {
 	Parse(r io.Reader) error
 }
 
-func Resolve(repo registry.Repository, desc oci.Descriptor, platform refs.Platform) (Handler, bool) {
-	h_ := handler{repo, desc, platform}
+func Resolve(repo upstream.Repository, desc oci.Descriptor) (Handler, bool) {
+	h_ := handler{repo, desc}
 
 	var h Handler
 	switch desc.MediaType {
@@ -34,9 +33,8 @@ func Resolve(repo registry.Repository, desc oci.Descriptor, platform refs.Platfo
 }
 
 type handler struct {
-	repo     registry.Repository
-	desc     oci.Descriptor
-	platform refs.Platform
+	Repo upstream.Repository
+	Desc oci.Descriptor
 }
 
 type portable struct{}

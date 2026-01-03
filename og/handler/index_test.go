@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/lesomnus/oras-get/og/handler"
+	"github.com/lesomnus/oras-get/og/upstream"
 	"github.com/lesomnus/oras-get/refs"
 	"github.com/opencontainers/go-digest"
 	oci "github.com/opencontainers/image-spec/specs-go/v1"
@@ -80,17 +81,23 @@ func TestIndex(t *testing.T) {
 		}))
 		defer s.Close()
 
-		repo, err := remote.NewRepository(fmt.Sprintf("%s/foo", s.URL[len("http://"):]))
+		ref, err := refs.Parse(s.URL[len("http://"):] + "/foo:bar")
 		x.NoError(err)
 
-		repo.Client = s.Client()
-		repo.PlainHTTP = true
+		reg, err := remote.NewRegistry(ref.Domain())
+		x.NoError(err)
+
+		reg.Client = s.Client()
+		reg.PlainHTTP = true
 
 		m, err := json.Marshal(index)
 		x.NoError(err)
 
 		for p, manifest := range manifests {
-			h, ok := handler.Resolve(repo, oci.Descriptor{MediaType: oci.MediaTypeImageIndex}, refs.Platform("linux/"+p))
+			upstream := upstream.Upstream{Registry: reg}
+			repo, err := upstream.Repository(t.Context(), refs.WithPlatform(ref, refs.Platform("linux/"+p)))
+
+			h, ok := handler.Resolve(repo, oci.Descriptor{MediaType: oci.MediaTypeImageIndex})
 			x.True(ok)
 
 			err = h.Parse(bytes.NewReader(m))
@@ -128,16 +135,22 @@ func TestIndex(t *testing.T) {
 		}))
 		defer s.Close()
 
-		repo, err := remote.NewRepository(fmt.Sprintf("%s/foo", s.URL[len("http://"):]))
+		ref, err := refs.Parse(s.URL[len("http://"):] + "/foo:bar")
 		x.NoError(err)
 
-		repo.Client = s.Client()
-		repo.PlainHTTP = true
+		reg, err := remote.NewRegistry(ref.Domain())
+		x.NoError(err)
+
+		reg.Client = s.Client()
+		reg.PlainHTTP = true
+
+		upstream := upstream.Upstream{Registry: reg}
+		repo, err := upstream.Repository(t.Context(), refs.WithPlatform(ref, refs.Platform("linux/arm64")))
 
 		m, err := json.Marshal(index)
 		x.NoError(err)
 
-		h, ok := handler.Resolve(repo, oci.Descriptor{MediaType: oci.MediaTypeImageIndex}, "linux/arm64")
+		h, ok := handler.Resolve(repo, oci.Descriptor{MediaType: oci.MediaTypeImageIndex})
 		x.True(ok)
 
 		err = h.Parse(bytes.NewReader(m))

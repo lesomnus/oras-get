@@ -17,7 +17,7 @@ type indexHandler struct {
 }
 
 func (h *indexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	p := h.platform.Normalized()
+	p := h.Repo.Reference.Platform().Normalized()
 	f := func(v oci.Descriptor) bool {
 		vp := v.Platform
 		if vp == nil {
@@ -28,9 +28,10 @@ func (h *indexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return vp.OS == os && vp.Architecture == arch && vp.Variant == variant
 	}
 
+	// Find normalized platform first, then try original.
 	i := slices.IndexFunc(h.manifest.Manifests, f)
 	if i < 0 {
-		p = h.platform
+		p = h.Repo.Reference.Platform()
 		i = slices.IndexFunc(h.manifest.Manifests, f)
 	}
 	if i < 0 {
@@ -39,7 +40,7 @@ func (h *indexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	desc := h.manifest.Manifests[i]
-	rc, err := h.repo.Manifests().Fetch(r.Context(), desc)
+	rc, err := h.Repo.Manifests().Fetch(r.Context(), desc)
 	if err != nil {
 		if errors.Is(err, errdef.ErrNotFound) {
 			http.Error(w, err.Error(), http.StatusPreconditionFailed)
@@ -50,7 +51,7 @@ func (h *indexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rc.Close()
 
-	h2, ok := Resolve(h.repo, desc, h.platform)
+	h2, ok := Resolve(h.Repo, desc)
 	if !ok {
 		panic("unreachable: failed to resolve manifest handler")
 	}

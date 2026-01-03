@@ -8,21 +8,18 @@ import (
 	"strings"
 
 	"github.com/lesomnus/oras-get/og/handler"
+	"github.com/lesomnus/oras-get/og/upstream"
 	"github.com/lesomnus/oras-get/refs"
 	"github.com/lesomnus/otx/log"
 	"oras.land/oras-go/v2/errdef"
-	"oras.land/oras-go/v2/registry/remote"
 )
 
 type Server struct {
-	registry *remote.Registry
+	Reference refs.Ref
+	Upstream  upstream.Upstream
 }
 
-func NewServer(registry *remote.Registry) Server {
-	return Server{registry}
-}
-
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet, http.MethodHead:
 		break
@@ -31,13 +28,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p := r.URL.Path
-	p, _ = strings.CutPrefix(p, "/")
+	ref := s.Reference
+	if ref == "" {
+		p := r.URL.Path
+		p, _ = strings.CutPrefix(p, "/")
 
-	ref, err := refs.Parse(p)
-	if err != nil {
-		http.Error(w, "invalid reference", http.StatusBadRequest)
-		return
+		var err error
+		ref, err = refs.Parse(p)
+		if err != nil {
+			http.Error(w, "invalid reference", http.StatusBadRequest)
+			return
+		}
 	}
 	if ref.Platform() != "" && ref.Platform().Arch() == "" {
 		http.Error(w, "invalid platform string: no arch", http.StatusBadRequest)
@@ -45,7 +46,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	repo, err := s.registry.Repository(ctx, ref.Repo())
+	repo, err := s.Upstream.Repository(ctx, ref)
 	if err != nil {
 		s.fail(ctx, w, err)
 		return
@@ -62,7 +63,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rc.Close()
 
-	h, ok := handler.Resolve(repo, desc, ref.Platform())
+	h, ok := handler.Resolve(repo, desc)
 	if !ok {
 		http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
 		return

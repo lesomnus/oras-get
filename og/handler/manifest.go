@@ -28,6 +28,10 @@ func (h *manifestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	layer := h.manifest.Layers[0]
+	if h.Repo.Upstream.Redirect {
+		h.Repo.Redirect(w, r, layer.Digest)
+		return
+	}
 	w.Header().Set("Content-Type", layer.MediaType)
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", layer.Size))
 	if r.Method == http.MethodHead {
@@ -35,7 +39,7 @@ func (h *manifestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rc, err := h.repo.Blobs().Fetch(r.Context(), layer)
+	rc, err := h.Repo.Blobs().Fetch(r.Context(), layer)
 	if err != nil {
 		if errors.Is(err, errdef.ErrNotFound) {
 			http.Error(w, err.Error(), http.StatusPreconditionFailed)

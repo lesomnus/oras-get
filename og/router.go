@@ -6,12 +6,13 @@ import (
 	"strings"
 
 	"github.com/lesomnus/oras-get/match"
+	"github.com/lesomnus/oras-get/og/upstream"
 	"github.com/lesomnus/oras-get/refs"
 	"github.com/lesomnus/otx/log"
 )
 
 type Router struct {
-	Upstreams map[string]Server
+	Upstreams map[string]upstream.Upstream
 	Matchers  []match.Matcher
 }
 
@@ -31,13 +32,13 @@ func (s *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		s, ok := s.Upstreams[name]
+		upstream, ok := s.Upstreams[name]
 		if !ok {
 			continue
 		}
 
-		var h http.Handler = &s
-		if ref.Domain() == "" {
+		var h http.Handler = Server{ref, upstream}
+		if ref.Domain() != "" {
 			h = http.StripPrefix("/"+ref.Domain(), h)
 		}
 
@@ -46,7 +47,7 @@ func (s *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		l = l.With(slog.String("upstream", name))
 		l.Info("route",
 			slog.Int("matcher", i),
-			slog.String("ref", s.registry.Reference.String()),
+			slog.String("ref", ref.Name()),
 		)
 
 		ctx = log.Into(ctx, l)
