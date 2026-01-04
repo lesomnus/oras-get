@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/lesomnus/oras-get/og/handler"
 	"github.com/lesomnus/oras-get/og/upstream"
@@ -14,41 +13,21 @@ import (
 	"oras.land/oras-go/v2/errdef"
 )
 
-type Server struct {
-	Reference refs.Ref
+type server struct {
 	Upstream  upstream.Upstream
+	Reference refs.Ref
 }
 
-func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet, http.MethodHead:
-		break
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	ref := s.Reference
-	if ref == "" {
-		p := r.URL.Path
-		p, _ = strings.CutPrefix(p, "/")
-
-		var err error
-		ref, err = refs.Parse(p)
-		if err != nil {
-			http.Error(w, "invalid reference", http.StatusBadRequest)
-			return
-		}
-	}
-	if ref.Platform() != "" && ref.Platform().Arch() == "" {
-		http.Error(w, "invalid platform string: no arch", http.StatusBadRequest)
-		return
-	}
-
+func (s server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	ref := s.Reference
 	repo, err := s.Upstream.Repository(ctx, ref)
 	if err != nil {
 		s.fail(ctx, w, err)
+		return
+	}
+	if ref.Tag() == "_" {
+		serveTagList(w, r, repo)
 		return
 	}
 
@@ -83,7 +62,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.ServeHTTP(w, r)
 }
 
-func (s *Server) fail(ctx context.Context, w http.ResponseWriter, err error) {
+func (s server) fail(ctx context.Context, w http.ResponseWriter, err error) {
 	log.From(ctx).Warn("request failed", slog.String("err", err.Error()))
 	http.Error(w, "internal server error", http.StatusInternalServerError)
 }

@@ -1,7 +1,6 @@
 package refs
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/distribution/reference"
@@ -13,7 +12,7 @@ type Ref string
 func Parse(s string) (Ref, error) {
 	i := strings.LastIndex(s, ":")
 	if i < 0 {
-		return "", errors.New("tag not found")
+		return Ref(s), nil
 	}
 
 	p := ""
@@ -51,7 +50,7 @@ func buildRef(domain, repo, tag string, platform Platform) Ref {
 func (r Ref) Split() (domain string, repo string, tag string, platform Platform) {
 	// [domain/]<repo>:<tag>[/<platform>]
 	if i := strings.LastIndex(string(r), ":"); i < 0 {
-		panic("invalid ref: no tag")
+		repo = string(r)
 	} else {
 		repo = string(r[:i])
 		tag = string(r[i+1:])

@@ -17,12 +17,28 @@ type Router struct {
 }
 
 func (s *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet, http.MethodHead:
+		break
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	p := r.URL.Path
 	p, _ = strings.CutPrefix(p, "/")
 
 	ref, err := refs.Parse(p)
 	if err != nil {
 		http.Error(w, "invalid reference", http.StatusBadRequest)
+		return
+	}
+	if ref.Tag() == "" {
+		http.Error(w, "reference must be tagged", http.StatusBadRequest)
+		return
+	}
+	if ref.Platform() != "" && ref.Platform().Arch() == "" {
+		http.Error(w, "invalid platform string: no arch", http.StatusBadRequest)
 		return
 	}
 
@@ -37,11 +53,6 @@ func (s *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		var h http.Handler = Server{ref, upstream}
-		if ref.Domain() != "" {
-			h = http.StripPrefix("/"+ref.Domain(), h)
-		}
-
 		ctx := r.Context()
 		l := log.From(ctx)
 		l = l.With(slog.String("upstream", name))
@@ -52,7 +63,7 @@ func (s *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		ctx = log.Into(ctx, l)
 		r = r.WithContext(ctx)
-		h.ServeHTTP(w, r)
+		server{upstream, ref}.serveHTTP(w, r)
 		return
 	}
 

@@ -16,6 +16,14 @@ func TestParse(t *testing.T) {
 		platform refs.Platform
 	}{
 		{
+			input: "repo",
+			repo:  "repo",
+		},
+		{
+			input: "path/to/repo",
+			repo:  "path/to/repo",
+		},
+		{
 			input: "repo:tag",
 			repo:  "repo",
 			tag:   "tag",

@@ -13,3 +13,4 @@ OCI registries are a good fit for this purpose, as they provide a standardized w
 | Method | Path                                    | Description       |
 | ------ | --------------------------------------- | ----------------- |
 | `GET`  | `[/<domain>]/<path>:<tag>[/<platform>]` | Retrieve artifact |
+| `GET`  | `[/<domain>]/<path>:_`                  | List tags         |
