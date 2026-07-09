@@ -86,10 +86,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Install oras
-        uses: oras-project/setup-oras@v1
-        with:
-          version: 1.3.2
+      - uses: oras-project/setup-oras@v1
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
