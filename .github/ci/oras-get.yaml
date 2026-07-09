@@ -1,0 +1,14 @@
+# oras-get configuration for the CI e2e job. The server and the zot registry
+# both run with `--network host`, so oras-get reaches zot on localhost.
+server:
+  addr: 0.0.0.0:5001
+
+registries:
+  ~fallback:
+    addr: http://localhost:5000
+
+routes:
+  # Requests without a domain fall back to the zot registry.
+  - next: "{{ .Domain }}"
+  - next: ~fallback
+    domain: ""
