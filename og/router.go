@@ -37,6 +37,12 @@ func (s *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "reference must be tagged", http.StatusBadRequest)
 		return
 	}
+
+	// The platform selects a manifest out of an image index and is supplied as
+	// a query parameter, e.g. "?platform=linux/amd64".
+	if p := r.URL.Query().Get("platform"); p != "" {
+		ref = refs.WithPlatform(ref, refs.Platform(p))
+	}
 	if ref.Platform() != "" && ref.Platform().Arch() == "" {
 		http.Error(w, "invalid platform string: no arch", http.StatusBadRequest)
 		return

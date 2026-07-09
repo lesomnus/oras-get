@@ -3,28 +3,21 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-
     command: sleep infinity
 
+    user: "1000"
     privileged: true
-    cap_add:
-      - SYS_PTRACE
-    security_opt:
-      - seccomp:unconfined
+    environment:
+      SHELL: /bin/zsh
 
     volumes:
-      - type: bind
-        source: ../
-        target: /workspace/
-      - type: bind
-        source: ${HOME}/workspaces
-        target: /workspaces
-      - type: volume
-        source: go.cache.mod
-        target: /go/pkg/mod/
-      - type: volume
-        source: go.cache.bin
-        target: /home/hypnos/.cache/go-build/
+      - command.history:/commandhistory
+      - go.cache.mod:/home/hypnos/go/pkg/mod
+      - go.cache.bin:/home/hypnos/.cache/go-build
+
+      - ..:/workspace
+      - ${HOME}/workspaces:/workspaces
+      - ${HOME}/.claude:/home/hypnos/.claude
 
   registry:
     image: ghcr.io/project-zot/zot:v2.1.12
@@ -37,5 +30,6 @@ services:
         target: /_
 
 volumes:
+  command.history:
   go.cache.mod:
   go.cache.bin:

@@ -4,98 +4,170 @@ import (
 	"strings"
 
 	"github.com/distribution/reference"
-	"github.com/lesomnus/z"
 )
 
+// Ref is an artifact reference, kept as the raw string and re-parsed on demand
+// so that the string is always the single source of truth. Its form mirrors the
+// request URL:
+//
+//	[<domain>/]<repo>:<tag>[/<file>][?platform=<platform>]
+//
+// The file component selects a single file (an OCI layer, identified by its
+// "org.opencontainers.image.title" annotation) within the target manifest. A
+// trailing slash with an empty file (e.g. "repo:tag/") requests a listing of
+// the available files instead.
+//
+// The platform is not part of the path; it selects a manifest out of an image
+// index and is carried as a "?platform=" suffix, populated from the request's
+// query parameter via WithPlatform.
 type Ref string
 
+const platformMark = "?platform="
+
+// Parse validates s (which must be in path form, without a platform query) and
+// returns it as a Ref. The reference grammar is checked against the
+// domain/repo/tag portion only; the file path may legally contain characters
+// (e.g. colons) that a bare reference may not.
 func Parse(s string) (Ref, error) {
-	i := strings.LastIndex(s, ":")
-	if i < 0 {
-		return Ref(s), nil
-	}
+	domain, repo, tag, file, list, platform := Ref(s).Split()
 
-	p := ""
-	j := strings.Index(s[i+1:], "/")
-	if j >= 0 {
-		p = s[i+1+j+1:]
-		s = s[:i+1+j]
+	name := repo
+	if domain != "" {
+		name = domain + "/" + repo
 	}
-
-	v, err := reference.Parse(s)
-	if err != nil {
+	if tag != "" {
+		name += ":" + tag
+	}
+	if _, err := reference.Parse(name); err != nil {
 		return "", err
 	}
 
-	w, ok := v.(reference.NamedTagged)
-	if !ok {
-		return "", z.Err(reference.ErrReferenceInvalidFormat, "reference must be tagged")
-	}
-
-	return buildRef(reference.Domain(w), reference.Path(w), w.Tag(), Platform(p)), nil
+	return build(domain, repo, tag, file, list, platform), nil
 }
 
-func buildRef(domain, repo, tag string, platform Platform) Ref {
-	r := ""
-	if domain != "" {
-		r += domain + "/"
-	}
-	r += repo + ":" + tag
-	if platform != "" {
-		r += "/" + string(platform)
-	}
-	return Ref(r)
-}
+// Split decomposes the reference every time it is called. Nothing is cached, so
+// there is no way for the parts to drift out of sync with the string.
+func (r Ref) Split() (domain, repo, tag, file string, list bool, platform Platform) {
+	s := string(r)
 
-func (r Ref) Split() (domain string, repo string, tag string, platform Platform) {
-	// [domain/]<repo>:<tag>[/<platform>]
-	if i := strings.LastIndex(string(r), ":"); i < 0 {
-		repo = string(r)
-	} else {
-		repo = string(r[:i])
-		tag = string(r[i+1:])
+	// Peel off the platform query, if any.
+	if i := strings.Index(s, platformMark); i >= 0 {
+		platform = Platform(s[i+len(platformMark):])
+		s = s[:i]
 	}
 
-	// Find domain
-	if i := strings.Index(repo, "/"); i >= 0 {
-		d := repo[:i]
-		if strings.Contains(d, ".") || strings.Contains(d, ":") {
-			domain = d
-			repo = repo[i+1:]
+	// Peel off an optional leading domain. This must happen before we look for
+	// the tag separator: a domain may carry a port colon and the file path may
+	// carry colons of its own, so scanning for a ":" over the whole string would
+	// pick the wrong one. The first segment is a domain only when it looks like
+	// a host (a "." or a "host:port"), matching how a request URL without an
+	// explicit domain is read; otherwise it is part of the repo.
+	rest := s
+	if i := strings.Index(s, "/"); i >= 0 && looksLikeDomain(s[:i]) {
+		domain = s[:i]
+		rest = s[i+1:]
+	}
+
+	// rest is now "repo:tag[/file]". A repository path never contains a colon,
+	// so the first colon is the tag separator, and the file (if any) begins at
+	// the first slash following the tag.
+	repo = rest
+	if i := strings.Index(rest, ":"); i >= 0 {
+		repo = rest[:i]
+		tag = rest[i+1:]
+		if j := strings.Index(tag, "/"); j >= 0 {
+			file = tag[j+1:]
+			list = file == ""
+			tag = tag[:j]
 		}
 	}
-
-	// Find platform
-	if i := strings.Index(tag, "/"); i >= 0 {
-		platform = Platform(tag[i+1:])
-		tag = tag[:i]
-	}
-
 	return
 }
 
+// build renders the canonical reference string from its parts. It is the
+// inverse of Split.
+func build(domain, repo, tag, file string, list bool, platform Platform) Ref {
+	var b strings.Builder
+	if domain != "" {
+		b.WriteString(domain)
+		b.WriteByte('/')
+	}
+	b.WriteString(repo)
+	if tag != "" {
+		b.WriteByte(':')
+		b.WriteString(tag)
+	}
+	if file != "" {
+		b.WriteByte('/')
+		b.WriteString(file)
+	} else if list {
+		b.WriteByte('/')
+	}
+	if platform != "" {
+		b.WriteString(platformMark)
+		b.WriteString(string(platform))
+	}
+	return Ref(b.String())
+}
+
+// looksLikeDomain reports whether a leading path segment should be read as a
+// registry host rather than as the first component of a repository path.
+func looksLikeDomain(s string) bool {
+	if strings.Contains(s, ".") {
+		return true
+	}
+	// A "host:port" form, where the port is numeric.
+	if i := strings.LastIndex(s, ":"); i >= 0 {
+		port := s[i+1:]
+		if port == "" {
+			return false
+		}
+		for _, r := range port {
+			if r < '0' || r > '9' {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
 func (r Ref) Domain() string {
-	v, _, _, _ := r.Split()
+	v, _, _, _, _, _ := r.Split()
 	return v
 }
 
 func (r Ref) Repo() string {
-	_, v, _, _ := r.Split()
+	_, v, _, _, _, _ := r.Split()
 	return v
 }
 
 func (r Ref) Tag() string {
-	_, _, v, _ := r.Split()
+	_, _, v, _, _, _ := r.Split()
+	return v
+}
+
+// File returns the selected file path within the target artifact, or "" if no
+// specific file was requested.
+func (r Ref) File() string {
+	_, _, _, v, _, _ := r.Split()
+	return v
+}
+
+// ListFiles reports whether a listing of the available files was requested
+// (i.e. the reference ended with a trailing slash, "repo:tag/").
+func (r Ref) ListFiles() bool {
+	_, _, _, _, v, _ := r.Split()
 	return v
 }
 
 func (r Ref) Platform() Platform {
-	_, _, _, v := r.Split()
+	_, _, _, _, _, v := r.Split()
 	return v
 }
 
 func (r Ref) Name() string {
-	domain, repo, _, _ := r.Split()
+	domain, repo, _, _, _, _ := r.Split()
 	if domain != "" {
 		return domain + "/" + repo
 	}
@@ -103,11 +175,16 @@ func (r Ref) Name() string {
 }
 
 func WithDomain(r Ref, d string) Ref {
-	_, repo, tag, p := r.Split()
-	return buildRef(d, repo, tag, p)
+	_, repo, tag, file, list, platform := r.Split()
+	return build(d, repo, tag, file, list, platform)
 }
 
 func WithPlatform(r Ref, p Platform) Ref {
-	domain, repo, tag, _ := r.Split()
-	return buildRef(domain, repo, tag, p)
+	domain, repo, tag, file, list, _ := r.Split()
+	return build(domain, repo, tag, file, list, p)
+}
+
+func WithFile(r Ref, f string) Ref {
+	domain, repo, tag, _, _, platform := r.Split()
+	return build(domain, repo, tag, f, false, platform)
 }
