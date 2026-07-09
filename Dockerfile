@@ -29,7 +29,7 @@ ARG APP_VERSION
 RUN BUILD_HASH=${BUILD_HASH} \
 	BUILD_ID=${BUILD_ID} \
 	APP_VERSION=${APP_VERSION} \
-	./scripts/gen-version.sh
+	./scripts/gen-version-file.sh
 
 ARG TARGETARCH
 RUN --mount=type=cache,target=/root/.cache/go-build \
