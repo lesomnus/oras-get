@@ -9,6 +9,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/opencontainers/go-digest"
 	oci "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/errdef"
 )
@@ -24,13 +25,26 @@ func (h *manifestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ref := h.Repo.Reference
 
 	if ref.ListFiles() {
-		serveFileList(w, r, layers)
+		serveFileList(w, r, layers, h.Desc.Digest)
 		return
 	}
 
 	layer, code, msg := selectLayer(layers, ref.File())
 	if code != 0 {
 		http.Error(w, msg, code)
+		return
+	}
+
+	// A layer's digest is a strong, content-addressed validator. Expose it as an
+	// ETag so clients (browsers, CDNs, proxies) can cache the file and revalidate
+	// cheaply. Because a tag may be re-pushed, we ask clients to revalidate
+	// rather than assume freshness; when they do, an unchanged file costs only a
+	// 304 and never re-fetches the blob from upstream.
+	etag := etagOf(layer.Digest)
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Cache-Control", "no-cache")
+	if ifNoneMatch(r, etag) {
+		w.WriteHeader(http.StatusNotModified)
 		return
 	}
 
@@ -101,8 +115,20 @@ func selectLayer(layers []oci.Descriptor, file string) (_ oci.Descriptor, code i
 	return oci.Descriptor{}, http.StatusNotFound, fmt.Sprintf("no file %q in artifact", file)
 }
 
-func serveFileList(w http.ResponseWriter, r *http.Request, layers []oci.Descriptor) {
+func serveFileList(w http.ResponseWriter, r *http.Request, layers []oci.Descriptor, manifest digest.Digest) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+
+	// The listing is fully determined by the manifest, so its digest is a valid
+	// ETag for conditional requests.
+	if manifest != "" {
+		etag := etagOf(manifest)
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Cache-Control", "no-cache")
+		if ifNoneMatch(r, etag) {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+	}
 	if r.Method == http.MethodHead {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -113,6 +139,30 @@ func serveFileList(w http.ResponseWriter, r *http.Request, layers []oci.Descript
 	for _, name := range fileNames(layers) {
 		fmt.Fprintln(bw, name)
 	}
+}
+
+// etagOf renders a strong ETag from a content digest.
+func etagOf(d digest.Digest) string {
+	return `"` + d.String() + `"`
+}
+
+// ifNoneMatch reports whether the request's If-None-Match precondition matches
+// etag, i.e. the client already holds the current content (RFC 9110 §13.1.2).
+func ifNoneMatch(r *http.Request, etag string) bool {
+	h := r.Header.Get("If-None-Match")
+	if h == "" {
+		return false
+	}
+	if strings.TrimSpace(h) == "*" {
+		return true
+	}
+	for _, part := range strings.Split(h, ",") {
+		// If-None-Match uses the weak comparison, so a "W/" prefix is ignored.
+		if strings.TrimPrefix(strings.TrimSpace(part), "W/") == strings.TrimPrefix(etag, "W/") {
+			return true
+		}
+	}
+	return false
 }
 
 // fileNames returns the addressable file names in manifest order. Layers

@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -132,6 +133,21 @@ func TestE2EMultiFile(t *testing.T) {
 		res, body := do(t, router, http.MethodGet, "/oras-get-e2e/bundle:_")
 		x.Equal(http.StatusOK, res.StatusCode, string(body))
 		x.Contains(string(body), "v1")
+	})
+
+	t.Run("HEAD then conditional GET revalidates via ETag", func(t *testing.T) {
+		x := require.New(t)
+		res, body := do(t, router, http.MethodHead, "/oras-get-e2e/bundle:v1/tool")
+		x.Equal(http.StatusOK, res.StatusCode)
+		x.Empty(body)
+		etag := res.Header.Get("ETag")
+		x.NotEmpty(etag)
+		x.Equal(strconv.Itoa(len(tool)), res.Header.Get("Content-Length"))
+
+		// A conditional GET with the ETag the HEAD returned must not re-download.
+		res, body = doH(t, router, http.MethodGet, "/oras-get-e2e/bundle:v1/tool", http.Header{"If-None-Match": {etag}})
+		x.Equal(http.StatusNotModified, res.StatusCode)
+		x.Empty(body)
 	})
 }
 

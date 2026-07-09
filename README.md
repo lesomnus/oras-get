@@ -38,6 +38,24 @@ curl http://localhost:5001/ghcr.io/me/bundle:v1/
 curl -O "http://localhost:5001/ghcr.io/me/bundle:v1/bin/tool?platform=linux/arm64"
 ```
 
+## Caching
+
+`GET` and `HEAD` are both supported. A served file carries an `ETag` equal to
+its OCI layer digest (a strong, content-addressed validator) plus
+`Cache-Control: no-cache`, so clients cache the bytes and revalidate cheaply:
+
+```sh
+# HEAD fetches only the metadata (Content-Type, Content-Length, ETag) — no body
+curl -I http://localhost:5001/ghcr.io/me/bundle:v1/bin/tool
+
+# a conditional request returns 304 Not Modified when the file is unchanged,
+# without re-downloading the blob from the upstream registry
+curl -H 'If-None-Match: "sha256:..."' http://localhost:5001/ghcr.io/me/bundle:v1/bin/tool
+```
+
+Because the ETag is the layer digest, it stays stable across tag re-pushes as
+long as the file's bytes do not change.
+
 ## Testing
 
 ```sh

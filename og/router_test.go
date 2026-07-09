@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/lesomnus/oras-get/internal/registrytest"
@@ -36,9 +37,16 @@ func newRouter(t *testing.T, reg *registrytest.Registry) *og.Router {
 }
 
 func do(t *testing.T, router *og.Router, method, target string) (*http.Response, []byte) {
+	return doH(t, router, method, target, nil)
+}
+
+func doH(t *testing.T, router *og.Router, method, target string, header http.Header) (*http.Response, []byte) {
 	t.Helper()
 	ctx := log.Into(context.Background(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	req := httptest.NewRequest(method, target, nil).WithContext(ctx)
+	for k, vs := range header {
+		req.Header[k] = vs
+	}
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	res := w.Result()
@@ -188,6 +196,57 @@ func TestRouter(t *testing.T) {
 	})
 }
 
+func TestRouterCaching(t *testing.T) {
+	reg := registrytest.New(t)
+
+	data := []byte("cache me maybe")
+	blob := reg.AddBlob("application/octet-stream", "file.bin", data)
+	reg.Tag("cache", "v1", reg.AddManifest([]oci.Descriptor{blob}, nil))
+	router := newRouter(t, reg)
+
+	etag := `"` + blob.Digest.String() + `"`
+
+	t.Run("GET carries an ETag and Cache-Control", func(t *testing.T) {
+		x := require.New(t)
+		res, body := do(t, router, http.MethodGet, "/cache:v1/file.bin")
+		x.Equal(http.StatusOK, res.StatusCode)
+		x.Equal(data, body)
+		x.Equal(etag, res.Header.Get("ETag"))
+		x.NotEmpty(res.Header.Get("Cache-Control"))
+	})
+
+	t.Run("HEAD returns metadata without a body", func(t *testing.T) {
+		x := require.New(t)
+		res, body := do(t, router, http.MethodHead, "/cache:v1/file.bin")
+		x.Equal(http.StatusOK, res.StatusCode)
+		x.Empty(body)
+		x.Equal(etag, res.Header.Get("ETag"))
+		x.Equal(strconv.Itoa(len(data)), res.Header.Get("Content-Length"))
+	})
+
+	t.Run("a matching If-None-Match yields 304 with no body", func(t *testing.T) {
+		x := require.New(t)
+		res, body := doH(t, router, http.MethodGet, "/cache:v1/file.bin", http.Header{"If-None-Match": {etag}})
+		x.Equal(http.StatusNotModified, res.StatusCode)
+		x.Empty(body)
+		x.Equal(etag, res.Header.Get("ETag"))
+	})
+
+	t.Run("a stale If-None-Match still serves the content", func(t *testing.T) {
+		x := require.New(t)
+		res, body := doH(t, router, http.MethodGet, "/cache:v1/file.bin", http.Header{"If-None-Match": {`"sha256:0000"`}})
+		x.Equal(http.StatusOK, res.StatusCode)
+		x.Equal(data, body)
+	})
+
+	t.Run("HEAD on a tag list is allowed", func(t *testing.T) {
+		x := require.New(t)
+		res, body := do(t, router, http.MethodHead, "/cache:_")
+		x.Equal(http.StatusOK, res.StatusCode)
+		x.Empty(body)
+	})
+}
+
 func TestRouterRedirect(t *testing.T) {
 	reg := registrytest.New(t)
 
@@ -219,5 +278,12 @@ func TestRouterRedirect(t *testing.T) {
 		res, _ := do(t, router, http.MethodGet, "/redir:_")
 		x.Equal(http.StatusTemporaryRedirect, res.StatusCode)
 		x.Equal("http://"+reg.Host()+"/v2/redir/tags/list", res.Header.Get("Location"))
+	})
+
+	t.Run("a matching If-None-Match yields 304 instead of a redirect", func(t *testing.T) {
+		x := require.New(t)
+		etag := `"` + blob.Digest.String() + `"`
+		res, _ := doH(t, router, http.MethodGet, "/redir:v1/data.bin", http.Header{"If-None-Match": {etag}})
+		x.Equal(http.StatusNotModified, res.StatusCode)
 	})
 }
