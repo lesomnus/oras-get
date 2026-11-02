@@ -2,7 +2,7 @@ ARG BUILD_HASH="0000000000000000000000000000000000000000"
 ARG BUILD_ID="r0"
 ARG APP_VERSION="000000-r0"
 
-FROM golang:1.26 AS base
+FROM golang:1.27 AS base
 
 WORKDIR /app
 
@@ -38,7 +38,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 	&& GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o /dist/amd64 . \
 	&& "/dist/${TARGETARCH}" version
 
-FROM alpine:3.21 AS certs
+FROM alpine:3.24 AS certs
 RUN apk add --no-cache ca-certificates
 
 FROM scratch AS build
