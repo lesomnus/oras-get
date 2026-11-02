@@ -1,12 +1,14 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/lesomnus/oras-get/addr"
 	"github.com/lesomnus/oras-get/og/upstream"
+	"github.com/lesomnus/otx"
 	"github.com/lesomnus/otx/otxhttp"
 	"github.com/lesomnus/z"
 	"oras.land/oras-go/v2/registry/remote"
@@ -27,7 +29,7 @@ func (u *RegistryConfig) Evaluate() error {
 	)
 }
 
-func (u *RegistryConfig) Build() (upstream.Upstream, error) {
+func (u *RegistryConfig) Build(ctx context.Context) (upstream.Upstream, error) {
 	domain := u.Addr.HostPort()
 	reg, err := remote.NewRegistry(domain)
 	if err != nil {
@@ -52,7 +54,7 @@ func (u *RegistryConfig) Build() (upstream.Upstream, error) {
 
 	// TODO: from options
 	reg.Client = &http.Client{
-		Transport: otxhttp.NewTransport(http.DefaultTransport),
+		Transport: otxhttp.NewTransport(otx.From(ctx), http.DefaultTransport),
 	}
 
 	return upstream.Upstream{

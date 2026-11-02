@@ -3,9 +3,9 @@ package cmd
 import (
 	"context"
 
+	"github.com/goccy/go-yaml"
 	"github.com/lesomnus/oras-get/cmd/config"
 	"github.com/lesomnus/xli"
-	"gopkg.in/yaml.v3"
 )
 
 func NewCmdConfig() *xli.Command {

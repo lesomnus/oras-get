@@ -21,13 +21,13 @@ func NewCmdServe() *xli.Command {
 			l := log.From(ctx)
 			c := config.From(ctx)
 
-			r, err := c.NewRouter()
+			r, err := c.NewRouter(ctx)
 			if err != nil {
 				return z.Err(err, "build router")
 			}
 
 			h := http.Handler(r)
-			h = otxhttp.BoundaryLogger()(h)
+			h = otxhttp.BoundaryLogger(otx.From(ctx))(h)
 			h = otxhttp.NewMiddleware(otx.From(ctx), "serve")(h)
 			s := http.Server{Handler: h}
 
