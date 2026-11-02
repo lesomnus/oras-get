@@ -3,7 +3,6 @@ package config
 import (
 	"context"
 	"errors"
-	"os"
 
 	"github.com/lesomnus/mkot"
 	"github.com/lesomnus/oras-get/cmd/version"
@@ -13,28 +12,34 @@ import (
 	nooplog "go.opentelemetry.io/otel/log/noop"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
-	_ "github.com/lesomnus/mkot/otlp"
-	_ "github.com/lesomnus/mkot/otlphttp"
+	"github.com/lesomnus/mkot/otlp"
 	"github.com/lesomnus/mkot/pretty"
-	_ "github.com/lesomnus/mkot/pretty"
 )
+
+func init() {
+	// Existing files select HTTP by the exporter name. The unified exporter
+	// selects it by protocol; keep reading those files without changing it.
+	mkot.DefaultExporterRegistry.Set("otlphttp", func() mkot.ExporterConfig {
+		return &otlp.ExporterConfig{Protocol: "http/protobuf"}
+	})
+}
 
 type OtelConfig struct {
 	mkot.Config `yaml:",inline"`
 }
 
 func (c *OtelConfig) Evaluate() error {
-	if !c.Enabled {
+	if c.Enabled == nil || !*c.Enabled {
 		*c = OtelConfig{}
 		return nil
 	}
-	if !(c.Processors == nil && c.Exporters == nil && c.Providers == nil) {
+	if len(c.Processors)+len(c.Exporters)+len(c.Providers) > 0 {
 		return nil
 	}
 
 	c.Exporters = map[mkot.Id]mkot.ExporterConfig{
-		"pretty": &pretty.Config{
-			Output: os.Stdout,
+		"pretty": &pretty.ExporterConfig{
+			OutputPaths: []string{"stdout"},
 		},
 	}
 	c.Providers = map[mkot.Id]*mkot.ProviderConfig{
@@ -47,7 +52,7 @@ func (c *OtelConfig) Evaluate() error {
 }
 
 func (c *OtelConfig) Build(ctx context.Context) (*otx.Otx, error) {
-	if !c.Enabled {
+	if c.Enabled == nil || !*c.Enabled {
 		return otx.New(), nil
 	}
 	if c.Processors == nil {
@@ -55,8 +60,8 @@ func (c *OtelConfig) Build(ctx context.Context) (*otx.Otx, error) {
 	}
 
 	const ServiceResourceId mkot.Id = "resource/oras-get"
-	c.Processors[ServiceResourceId] = &mkot.ResourceProcessor{
-		Attributes: []mkot.Attribute{
+	c.Processors[ServiceResourceId] = &mkot.Resource{
+		Attributes: []mkot.Attr{
 			{Key: "service.name", Value: attribute.StringValue("oras-get")},
 			{Key: "service.version", Value: attribute.StringValue(version.Get().Version)},
 		},
@@ -69,7 +74,7 @@ func (c *OtelConfig) Build(ctx context.Context) (*otx.Otx, error) {
 
 	tracker_provider, err := resolver.Tracer(ctx, "")
 	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
+		if !errors.Is(err, mkot.ErrNotExist) {
 			return nil, z.Err(err, "resolve tracer provider")
 		}
 		tracker_provider = sdktrace.NewTracerProvider()
@@ -77,7 +82,7 @@ func (c *OtelConfig) Build(ctx context.Context) (*otx.Otx, error) {
 
 	logger_provider, err := resolver.Logger(ctx, "")
 	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
+		if !errors.Is(err, mkot.ErrNotExist) {
 			return nil, z.Err(err, "resolve logger provider")
 		}
 		logger_provider = nooplog.NewLoggerProvider()

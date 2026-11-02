@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/goccy/go-yaml"
 	"github.com/lesomnus/oras-get/match"
 	"github.com/lesomnus/oras-get/og"
 	"github.com/lesomnus/oras-get/og/upstream"
 	"github.com/lesomnus/z"
-	"gopkg.in/yaml.v3"
 )
 
 var use = z.NewUse[*Config]()
@@ -71,13 +71,13 @@ func (c *Config) Evaluate() error {
 	)
 }
 
-func (c *Config) NewRouter() (*og.Router, error) {
+func (c *Config) NewRouter(ctx context.Context) (*og.Router, error) {
 	r := &og.Router{
 		Upstreams: map[string]upstream.Upstream{},
 		Matchers:  []match.Matcher{},
 	}
 	for k, v := range c.Registries {
-		upstream, err := v.Build()
+		upstream, err := v.Build(ctx)
 		if err != nil {
 			return nil, z.Err(err, "build registry %q", k)
 		}
