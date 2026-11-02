@@ -10,8 +10,8 @@ require (
 	github.com/lesomnus/mkot/pretty v0.0.0-20261101233651-56284edc7453
 	github.com/lesomnus/otx v0.0.0-20261101232829-bc58838cf65b
 	github.com/lesomnus/otx/otxhttp v0.0.0-20261101232829-bc58838cf65b
-	github.com/lesomnus/xli v0.0.0-20251129214310-274b1fcfb863
-	github.com/lesomnus/z v0.0.0-20251207114116-bea71a8d64e4
+	github.com/lesomnus/xli v0.0.0-20261009121920-4ce270c7448c
+	github.com/lesomnus/z v0.0.0-20260907061127-c3858eb05878
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/stretchr/testify v1.12.1
@@ -20,7 +20,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.47.0
 	go.opentelemetry.io/proto/otlp v1.11.1
 	google.golang.org/protobuf v1.36.12
-	oras.land/oras-go/v2 v2.6.2
+	oras.land/oras-go/v2 v2.7.0
 )
 
 require (
