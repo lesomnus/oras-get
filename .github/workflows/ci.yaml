@@ -83,7 +83,7 @@ jobs:
       IMAGE: ghcr.io/lesomnus/oras-get:${{ github.event_name == 'workflow_dispatch' && inputs.tag || format('r{0}', github.run_id) }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - uses: oras-project/setup-oras@v1
