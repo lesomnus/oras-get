@@ -5,11 +5,11 @@ go 1.26.0
 require (
 	github.com/distribution/reference v0.6.0
 	github.com/goccy/go-yaml v1.19.2
-	github.com/lesomnus/mkot v0.0.0-20261101233651-56284edc7453
-	github.com/lesomnus/mkot/otlp v0.0.0-20261101233651-56284edc7453
-	github.com/lesomnus/mkot/pretty v0.0.0-20261101233651-56284edc7453
-	github.com/lesomnus/otx v0.0.0-20261101232829-bc58838cf65b
-	github.com/lesomnus/otx/otxhttp v0.0.0-20261101232829-bc58838cf65b
+	github.com/lesomnus/mkot v0.0.0-20261109051210-adf1656dc93b
+	github.com/lesomnus/mkot/otlp v0.0.0-20261109051210-adf1656dc93b
+	github.com/lesomnus/mkot/pretty v0.0.0-20261109051210-adf1656dc93b
+	github.com/lesomnus/otx v0.0.0-20261109051205-9adcf92d2c8d
+	github.com/lesomnus/otx/otxhttp v0.0.0-20261109051205-9adcf92d2c8d
 	github.com/lesomnus/xli v0.0.0-20261009121920-4ce270c7448c
 	github.com/lesomnus/z v0.0.0-20260907061127-c3858eb05878
 	github.com/opencontainers/go-digest v1.0.0
@@ -36,7 +36,7 @@ require (
 	github.com/mattn/go-isatty v0.0.23 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/bridges/otelslog v0.21.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.23.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.23.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.47.0 // indirect

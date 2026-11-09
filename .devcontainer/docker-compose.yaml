@@ -20,7 +20,7 @@ services:
       - ${HOME}/.claude:/home/hypnos/.claude
 
   registry:
-    image: ghcr.io/project-zot/zot:v2.1.22
+    image: ghcr.io/project-zot/zot:v2.1.23
     command: ["serve", "/_/config.json"]
     user: "1000:1000"
 
